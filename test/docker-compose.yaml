@@ -1,0 +1,139 @@
+version : "3.8"
+services:
+  prometheus:
+    image: prom/prometheus:latest
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml
+    #networks:
+     # - ezlearner-network  
+  grafana:
+    image: grafana/grafana:latest
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=password
+    #networks:
+     # - ezlearner-network
+    depends_on:
+      - prometheus
+  zookeeper:
+    image: zookeeper
+    ports:
+      - "2181:2181"
+    command: sh -c "chmod -R 755 /data && zkServer.sh start-foreground"
+    volumes:
+      - zookeeper-logs:/var/lib/zookeeper/logs
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+      ZOOKEEPER.REQUEST.TIMEOUT: 30000
+    #networks:
+     # - ezlearner-network
+  kafka:
+    image: wurstmeister/kafka
+    ports:
+      - "9092:9092"
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_HOME: /opt/kafka_2.13-2.8.1
+      KAFKA_ADVERTISED_HOST_NAME: kafka
+      KAFKA_ZOOKEEPER_CONNECT: "zookeeper:2181"
+      KAFKA_ADVERTISED_LISTENERS: "PLAINTEXT://kafka:9092"
+      #KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      #KAFKA_HOME: "/opt/kafka_2.13-2.8.1/bin"
+    #command: sh -c "/opt/kafka_2.13-2.8.1/bin/kafka-server-start.sh /opt/kafka_2.13-2.8.1/config/server.properties"
+    #networks:
+    #  - ezlearner-network
+  jobmanager:
+    image: flink:1.13.0-scala_2.12
+    expose:
+      - "6123"
+    ports:
+      - "8081:8081"
+    command: jobmanager
+    environment:
+      - JOB_MANAGER_RPC_ADDRESS=jobmanager
+    #networks:
+     # - ezlearner-network
+  taskmanager:
+    image: flink:1.13.0-scala_2.12
+    expose:
+      - "6121"
+      - "6122"
+    depends_on:
+      - jobmanager
+    links:
+      - "jobmanager:jobmanager"
+    command: taskmanager --add-opens java.base/java.lang=ALL-UNNAMED
+    environment:
+      - JOB_MANAGER_RPC_ADDRESS=jobmanager
+    #networks:
+     # - ezlearner-network
+  #flink:
+  #  image: flink:1.13.2-scala_2.12-java11
+  #  volumes:
+   #   - ./target/my-app-1.0-SNAPSHOT.jar:/opt/flink/usrlib/my-app-1.0-SNAPSHOT.jar
+   # ports:
+   #   - "8081:8081"
+   # environment:
+   #   JOB_CLASS_NAME: com.example.KafkaConsumerExample
+    #  KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+    #  KAFKA_GROUP_ID: test
+    #  KAFKA_TOPIC: my-topic
+  SERVICES:
+    image: priyam569/services:latest
+    mem_limit: 700m
+    ports:
+      - "8082:8082"
+    #networks:
+     # - ezlearner-network
+    depends_on: 
+      - kafka
+    deploy:
+      restart_policy:
+        condition: on-failure
+        delay: 55s
+        max_attempts: 3
+        window: 120s
+    environment:
+       SERVER.PORT: 8082	 
+       SPRING_PROFILES_ACTIVE: default
+       spring.kafka.bootstrap-servers: kafka:9092
+  #serviceconsumer:
+    #image: priyam569/servicesconsumer
+    #ports:
+     # - "8087:8085"
+    #networks:
+     # - ezlearner-network
+    #depends_on: 
+     # - kafka
+    #deploy:
+     # restart_policy:
+      #  condition: on-failure
+       # delay: 55s
+        #max_attempts: 3
+        #window: 180s
+    #environment:
+     #  spring.kafka.bootstrap-servers: kafka:9092
+  flinkproduceraggregator:
+    image: priyam569/flinkproduceraggregator
+    ports:
+      - "8088:8080"
+    #networks:
+     # - ezlearner-network
+    depends_on:
+      - taskmanager
+      - kafka
+    environment:
+       SERVER.PORT: 8080	 
+       SPRING_PROFILES_ACTIVE: default
+       spring.kafka.bootstrap-servers: kafka:9092
+    #command: --add-opens java.base/java.lang=ALL-UNNAMED
+#networks:
+ # ezlearner-network:
+volumes:
+  zookeeper-logs:

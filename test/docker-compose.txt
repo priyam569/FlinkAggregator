@@ -1,0 +1,8 @@
+version: '3'
+
+services:
+  zookeeper:
+    image: priyam569/zookeeper
+    ports:
+      - "2181:2181"
+    command: sh -c "./apache-zookeeper-3.8.1-bin/bin zkServer.sh start"

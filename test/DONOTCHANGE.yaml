@@ -1,0 +1,70 @@
+version : "3.8"
+services:
+  zookeeper:
+    image: zookeeper
+    ports:
+      - "2181:2181"
+    command: sh -c "chmod -R 755 /data && zkServer.sh start-foreground"
+    volumes:
+      - zookeeper-logs:/var/lib/zookeeper/logs
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+      ZOOKEEPER.REQUEST.TIMEOUT: 30000
+    networks:
+      - ezlearner-network
+  kafka:
+    image: wurstmeister/kafka
+    ports:
+      - "9092:9092"
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_HOME: /opt/kafka_2.13-2.8.1
+      KAFKA_ADVERTISED_HOST_NAME: kafka
+      KAFKA_ZOOKEEPER_CONNECT: "zookeeper:2181"
+      KAFKA_ADVERTISED_LISTENERS: "PLAINTEXT://kafka:9092"
+      #KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      #KAFKA_HOME: "/opt/kafka_2.13-2.8.1/bin"
+    #command: sh -c "/opt/kafka_2.13-2.8.1/bin/kafka-server-start.sh /opt/kafka_2.13-2.8.1/config/server.properties"
+    networks:
+      - ezlearner-network
+  SERVICES:
+    image: priyam569/services:latest
+    mem_limit: 700m
+    ports:
+      - "8082:8082"
+    networks:
+      - ezlearner-network
+    depends_on: 
+      - kafka
+    deploy:
+      restart_policy:
+        condition: on-failure
+        delay: 55s
+        max_attempts: 3
+        window: 120s
+    environment:
+       SERVER.PORT: 8082	 
+       SPRING_PROFILES_ACTIVE: default
+       spring.kafka.bootstrap-servers: "kafka:9092"
+  serviceconsumer:
+    image: priyam569/servicesconsumer
+    ports:
+      - "8087:8085"
+    networks:
+      - ezlearner-network
+    depends_on: 
+      - kafka
+    deploy:
+      restart_policy:
+        condition: on-failure
+        delay: 55s
+        max_attempts: 3
+        window: 180s
+    environment:
+       spring.kafka.bootstrap-servers: "kafka:9092"
+networks:
+  ezlearner-network:
+volumes:
+  zookeeper-logs:

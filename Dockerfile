@@ -1,0 +1,12 @@
+FROM zookeeper:3.8.1
+
+# Add a new user
+RUN useradd -ms /bin/bash newuser
+
+# Set the working directory
+WORKDIR /apache-zookeeper-3.8.1-bin
+
+# Set the owner of the directory to the new user
+RUN chown -R newuser:newuser /apache-zookeeper-3.8.1-bin
+RUN chown -R newuser:newuser /apache-zookeeper-3.8.1-bin/bin
+RUN chown -R newuser:newuser /conf
